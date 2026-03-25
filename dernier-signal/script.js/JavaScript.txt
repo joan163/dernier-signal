@@ -1,0 +1,117 @@
+// SETTINGS
+let settings={sens:0.002, volume:0.5};
+let storageKey="dernierSignalSettings";
+loadSettings();
+
+// THREE.JS SCENE
+let scene=new THREE.Scene();
+scene.background=new THREE.Color(0x111111);
+let camera=new THREE.PerspectiveCamera(75,window.innerWidth/window.innerHeight,0.1,1000);
+let renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(window.innerWidth,window.innerHeight);
+document.body.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xffffff,0x444444));
+
+// GROUND
+let groundTex=new THREE.TextureLoader().load('assets/textures/ground.png');
+let ground=new THREE.Mesh(new THREE.PlaneGeometry(500,500), new THREE.MeshStandardMaterial({map:groundTex}));
+ground.rotation.x=-Math.PI/2;
+scene.add(ground);
+
+// BUILDINGS RANDOM
+let buildings=[], buildingTex=new THREE.TextureLoader().load('assets/textures/building.png');
+for(let i=0;i<50;i++){
+ let h=5+Math.random()*15;
+ let mesh=new THREE.Mesh(new THREE.BoxGeometry(5,h,5), new THREE.MeshStandardMaterial({map:buildingTex}));
+ mesh.position.set(Math.random()*200-100,h/2,Math.random()*200-100);
+ scene.add(mesh); buildings.push(mesh);
+}
+
+// LOOT
+let loot=[], itemTypes=["metal","food","water","battery","cloth"];
+for(let i=0;i<60;i++){
+ let obj=new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshStandardMaterial({color:0xffff00}));
+ obj.position.set(Math.random()*200-100,0.5,Math.random()*200-100);
+ obj.userData.type=itemTypes[Math.floor(Math.random()*itemTypes.length)];
+ scene.add(obj); loot.push(obj);
+}
+
+// PLAYER
+let velocity=new THREE.Vector3(), move={f:0,b:0,l:0,r:0,run:0}, yaw=0, pitch=0, canJump=true;
+camera.position.y=2;
+
+// CONTROLS
+document.addEventListener("click",()=>document.body.requestPointerLock());
+document.addEventListener("mousemove",e=>{
+ if(document.pointerLockElement===document.body){
+  yaw -= e.movementX*settings.sens;
+  pitch -= e.movementY*settings.sens;
+  pitch=Math.max(-1.5,Math.min(1.5,pitch));
+ }
+});
+document.addEventListener("keydown",e=>{
+ if(e.code==="KeyZ") move.f=1; if(e.code==="KeyS") move.b=1; if(e.code==="KeyQ") move.l=1; if(e.code==="KeyD") move.r=1;
+ if(e.code==="ShiftLeft") move.run=1; if(e.code==="Space"&&canJump){velocity.y=6; canJump=false;}
+ if(e.code==="KeyE") pickup(); if(e.code==="KeyI") openInv(); if(e.code==="KeyC") openCraft(); if(e.code==="Escape") toggleMenu();
+});
+document.addEventListener("keyup",e=>{
+ if(e.code==="KeyZ") move.f=0; if(e.code==="KeyS") move.b=0; if(e.code==="KeyQ") move.l=0; if(e.code==="KeyD") move.r=0;
+ if(e.code==="ShiftLeft") move.run=0;
+});
+
+// INVENTORY + CRAFT
+let inventory=Array(27).fill(null), equipment={right:null,left:null,ring1:null,ring2:null};
+let recipes=[{name:"Bâton électrique",req:{metal:1,battery:1}},{name:"Bandage",req:{cloth:1}},{name:"Eau potable",req:{water:1}}];
+
+function addItem(type){for(let i=0;i<inventory.length;i++){if(!inventory[i]){inventory[i]={type:type,qty:1};return;}}}
+function pickup(){loot.forEach((obj,i)=>{if(camera.position.distanceTo(obj.position)<2){addItem(obj.userData.type);scene.remove(obj);}});}
+function openInv(){document.getElementById("inventory").style.display="block";drawInventory();}
+function closeInv(){document.getElementById("inventory").style.display="none";}
+function drawInventory(){
+ let grid=document.getElementById("invGrid"); grid.innerHTML="";
+ inventory.forEach(item=>{let div=document.createElement("div"); div.className="slot"; div.innerText=item?item.type:""; grid.appendChild(div);});
+ let eq=document.getElementById("equip"); eq.innerHTML=JSON.stringify(equipment);
+}
+function openCraft(){document.getElementById("craft").style.display="block";drawCraft();}
+function closeCraft(){document.getElementById("craft").style.display="none";}
+function drawCraft(){
+ let search=document.getElementById("craftSearch").value.toLowerCase();
+ let div=document.getElementById("craftList"); div.innerHTML="";
+ recipes.forEach(r=>{if(r.name.toLowerCase().includes(search)){let btn=document.createElement("button"); btn.innerText=r.name; btn.onclick=()=>craft(r); div.appendChild(btn);}});
+}
+document.getElementById("craftSearch")?.addEventListener("input",drawCraft);
+function craft(r){
+ let invCount={}; inventory.forEach(i=>{if(i) invCount[i.type]=(invCount[i.type]||0)+1;});
+ for(let k in r.req){if(!invCount[k]||invCount[k]<r.req[k]) return;}
+ for(let k in r.req){let need=r.req[k]; for(let i=0;i<inventory.length && need>0;i++){if(inventory[i]&&inventory[i].type===k){inventory[i]=null; need--;}}}
+ addItem(r.name); drawInventory();
+}
+
+// SURVIVAL
+let hunger=100, thirst=100;
+
+// MENU
+function toggleMenu(){let m=document.getElementById("menu"); m.style.display=(m.style.display==="block")?"none":"block";}
+function resume(){toggleMenu();}
+function openSettings(){alert("Réglages à implémenter (volume, touches, graphiques)");}
+
+// GAME LOOP
+function animate(){
+ requestAnimationFrame(animate);
+ let speed=move.run?0.15:0.08;
+ let dir=new THREE.Vector3(move.r-move.l,0,move.b-move.f).normalize();
+ let mx=dir.x*Math.cos(yaw)-dir.z*Math.sin(yaw); let mz=dir.z*Math.cos(yaw)+dir.x*Math.sin(yaw);
+ velocity.x=mx*speed; velocity.z=mz*speed; velocity.y-=0.2;
+ camera.position.add(velocity);
+ if(camera.position.y<2){camera.position.y=2; velocity.y=0; canJump=true;}
+ camera.rotation.order="YXZ"; camera.rotation.y=yaw; camera.rotation.x=pitch;
+ hunger-=0.01; thirst-=0.02;
+ document.getElementById("hunger").innerText=Math.floor(hunger);
+ document.getElementById("thirst").innerText=Math.floor(thirst);
+ renderer.render(scene,camera);
+}
+animate();
+
+// SETTINGS STORAGE
+function saveSettings(){localStorage.setItem(storageKey,JSON.stringify(settings));}
+function loadSettings(){let s=localStorage.getItem(storageKey); if(s) settings=JSON.parse(s);}
