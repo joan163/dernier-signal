@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Dernier Signal – Survie</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="hud">
+  Faim: <span id="hunger">100</span> | Soif: <span id="thirst">100</span>
+</div>
+
+<div id="menu">
+  <h2>Pause</h2>
+  <button onclick="resume()">Continuer</button>
+  <button onclick="openSettings()">Réglages</button>
+</div>
+
+<div id="inventory">
+  <h3>Inventaire</h3>
+  <div id="invGrid"></div>
+  <h4>Équipement</h4>
+  <div id="equip"></div>
+  <button onclick="closeInv()">Fermer</button>
+</div>
+
+<div id="craft">
+  <h3>Craft</h3>
+  <input type="text" id="craftSearch" placeholder="Filtrer...">
+  <div id="craftList"></div>
+  <button onclick="closeCraft()">Fermer</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
